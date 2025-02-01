@@ -5,6 +5,8 @@ import os
 from dotenv import load_dotenv  # For loading .env file
 from openai import OpenAI
 # -------------------------- LOCAL ---------------------
+
+# ------------------------------------------------------
 # Load environment variables from .env file
 load_dotenv()
 
@@ -14,46 +16,49 @@ OPENAI_API_KEY = os.getenv("API_KEY")  # Read API key from .env
 
 # initialize the OpenAI client
 client = OpenAI()
-
-def query_llm(prompt: str, system_prompt = "You are a helpful assistant.", temperature: float = 0.7, max_tokens: int = 100) -> str:
+def query_llm(
+    prompt: str,
+    system_prompt: str = "You are a helpful assistant.",
+    **kwargs  # Extra parameters such as temperature, max_tokens, etc.
+) -> str:
     """
     Send a prompt to the LLM and return the response.
-    
+
     Args:
         prompt (str): The input prompt.
-        temperature (float): Controls randomness (0 = deterministic, 1 = creative).
-        max_tokens (int): Maximum length of the response.
-    
+        system_prompt (str): A system-level prompt.
+        **kwargs: Additional keyword arguments passed to the LLM API call,
+                  e.g., temperature, max_tokens, etc.
+
     Returns:
         str: The LLM's response.
     """
 
-    # Send the request
     try:
-        
         completion = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": system_prompt},    
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            temperature=temperature,
-            max_tokens=max_tokens
+            **kwargs  # Pass additional parameters into the API call
         )
-
-        if VERBOSE: print(completion.model_dump_json(indent=2))
-
         text = completion.choices[0].message.content
-        usage = dict(completion).get('usage')
-        
-        if VERBOSE: print(f"Usage: {usage}")
-        if VERBOSE: print(f"Response: {text}")
-        
+ 
+        if VERBOSE:
+            print(completion.model_dump_json(indent=2))
+            usage = dict(completion).get('usage')
+            print(f"Usage: {usage}")
+        #
+
         return text
+
     except Exception as e:
         return f"Error: {str(e)}"
     #
 #
+
+
 
 if __name__ == "__main__":
     """Interactive loop for querying the LLM."""

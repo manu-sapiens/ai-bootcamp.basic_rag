@@ -189,7 +189,4 @@ if __name__ == "__main__":
     query = "Explain quantum computing in simple terms."
     print(f"\nQuery: {query}")
     print(f"Final Answer: {query_llm_with_tools(query)}")
-    
-    # # Example 3: Run the test harness with 10 generated queries.
-    print("\nRunning 10-query test harness for tool detection and execution...")
-    test_tool_detection_system(10)
+#
