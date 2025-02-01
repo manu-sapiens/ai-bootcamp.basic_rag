@@ -1,44 +1,79 @@
 import ollama
 from typing import List, Tuple
-import numpy as np
 
-#EMBED_MODEL = "mxbai-embed-large"
 EMBED_MODEL = "all-minilm"
+OLLAMA_EMBEDDING_KEY = "embeddings"
 
 class SimpleVectorDB:
     def __init__(self):
-        self.data = []  # To store tuples of (id, embedding, document)
+        # Store documents as a list of dictionaries for clarity
+        self.data = []  # Format: [{"doc_id": str, "doc_embedding": List[float], "doc_text": str}]
 
-    def add(self, ids: List[str], embeddings: List[List[float]], documents: List[str]):
-        """Add embeddings and documents to the database."""
-        for id_, embedding, document in zip(ids, embeddings, documents):
-            embedding_array = np.array(embedding, dtype=np.float32)
-            self.data.append((id_, embedding_array, document))
+    def add_document(self, embedding: List[float], text: str):
+        """Add a single document with auto-generated ID."""
+        doc_id = f"doc_{len(self.data) + 1}"
+        self.data.append({
+            "doc_id": doc_id,
+            "doc_embedding": embedding,
+            "doc_text": text
+        })
 
-    def query(self, query_embedding: List[float], n_results: int = 1) -> List[Tuple[str, str, float]]:
+    def query(self, query_embedding: List[float], n_results: int = 3) -> List[Tuple[str, float]]:
         """
-        Query the database for the closest embeddings.
-        Returns the closest `n_results` items based on cosine similarity.
+        Compare query to all documents using cosine similarity.
+        Returns top n_results as (id, text, similarity_score).
         """
-        query_vector = np.array(query_embedding, dtype=np.float32)
-
-        # Calculate cosine similarity between the query and all stored embeddings
         results = []
-        for id_, embedding, document in self.data:
-            similarity = self._cosine_similarity(query_vector, embedding)
-            results.append((id_, document, similarity))
-
-        # Sort by similarity in descending order and return the top n_results
-        results = sorted(results, key=lambda x: x[2], reverse=True)
+        
+        # Calculate similarity for each document
+        for entry in self.data:
+            similarity = self.cosine_similarity(query_embedding, entry["doc_embedding"])
+            results.append((entry["doc_id"], similarity))
+        
+        # Sort by similarity (highest first)
+        results.sort(key=lambda x: x[2], reverse=True)
         return results[:n_results]
 
     @staticmethod
-    def _cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
-        """Calculate the cosine similarity between two vectors."""
-        return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+    def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+        """Pure-Python cosine similarity without numpy."""
+        if len(vec_a) != len(vec_b):
+            raise ValueError("Vectors must be the same length")
+        
+        dot_product = 0.0
+        magnitude_a = 0.0
+        magnitude_b = 0.0
+        
+        for i in range(len(vec_a)):
+            dot_product += vec_a[i] * vec_b[i]
+            magnitude_a += vec_a[i] ** 2
+            magnitude_b += vec_b[i] ** 2
+        
+        magnitude_a = magnitude_a ** 0.5
+        magnitude_b = magnitude_b ** 0.5
+        
+        if magnitude_a * magnitude_b == 0:
+            return 0.0
+        return dot_product / (magnitude_a * magnitude_b)
+    #  
+#
+
+def embed_with_ollama(text: str) -> List[float]:
+    
+    ollama_response = ollama.embed(model=EMBED_MODEL, input=text)
+    embedding = ollama_response.get(OLLAMA_EMBEDDING_KEY)
+    if embedding is None:
+        failure_message = f"No [{OLLAMA_EMBEDDING_KEY}] key found in response: {ollama_response}"
+        raise ValueError(failure_message)
+    #
+    
+    return embedding
+#
 
 
+# Example usage
 if __name__ == "__main__":
+
     # Example documents about llamas
     documents = [
         "Llamas are members of the camelid family meaning they're pretty closely related to vicuñas and camels",
@@ -49,31 +84,30 @@ if __name__ == "__main__":
         "Llamas live to be about 20 years old, though some only live for 15 years and others live to be 30 years old",
     ]
 
-    # Initialize the vector database
-    collection = SimpleVectorDB()
+    # Initialize DB
+    db = SimpleVectorDB()
 
-    # Store each document in the vector database
-    for i, doc in enumerate(documents):
-        response = ollama.embed(model=EMBED_MODEL, input=doc)
-        print(f"Processing document #{i}")
-        collection.add(
-            ids=[str(i)],
-            embeddings=response["embeddings"],
-            documents=[doc]
-        )
+    # Add documents one by one
+    i = 0
+    for text in documents:
+        # Get embedding from Ollama
+        embedding = embed_with_ollama(text)
+        
+        # Add to DB
+        db.add_document(embedding, text)
+        i += 1
+    #
+    
+    print(f"Added {len(documents)} documents to the database.")
 
-    # Example query
-    prompt = "What animals are llamas related to?"
-    print(f"\nQuery: {prompt}")
-
-    # Generate embedding for the query
-    response = ollama.embed(
-        model=EMBED_MODEL,
-        input=prompt
-    )
-
-    # Perform the query and print results
-    results = collection.query(response["embeddings"][0], n_results=1)
-    for res_id, res_doc, similarity in results:
-        print(f"\nMost relevant document (ID: {res_id}, Similarity: {similarity:.4f}):")
-        print(f"{res_doc}")
+    # Query
+    query = "What animals are llamas related to?"
+    query_embedding = embed_with_ollama(query)
+    
+    # Get results
+    results = db.query(query_embedding, n_results=1)
+    print("\nTop result:")
+    print(f"ID: {results[0][0]}")
+    print(f"Text: {results[0][1]}")
+    print(f"Similarity: {results[0][2]:.4f}")
+#
