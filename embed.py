@@ -7,16 +7,15 @@ OLLAMA_EMBEDDING_KEY = "embeddings"
 class SimpleVectorDB:
     def __init__(self):
         # Store documents as a list of dictionaries for clarity
-        self.data = []  # Format: [{"doc_id": str, "doc_embedding": List[float], "doc_text": str}]
+        self.data = {}  # Format: {"doc_id": {"doc_embedding": List[float], "doc_text": str}}
 
     def add_document(self, embedding: List[float], text: str):
         """Add a single document with auto-generated ID."""
         doc_id = f"doc_{len(self.data) + 1}"
-        self.data.append({
-            "doc_id": doc_id,
+        self.data[doc_id] = {
             "doc_embedding": embedding,
             "doc_text": text
-        })
+        }
 
     def query(self, query_embedding: List[float], n_results: int = 3) -> List[Tuple[str, float]]:
         """
@@ -26,19 +25,21 @@ class SimpleVectorDB:
         results = []
         
         # Calculate similarity for each document
-        for entry in self.data:
+        for doc_id, entry in self.data.items():
             similarity = self.cosine_similarity(query_embedding, entry["doc_embedding"])
-            results.append((entry["doc_id"], similarity))
+            results.append((doc_id, similarity))
         
         # Sort by similarity (highest first)
-        results.sort(key=lambda x: x[2], reverse=True)
+        results.sort(key=lambda x: x[1], reverse=True)
         return results[:n_results]
 
     @staticmethod
     def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
         """Pure-Python cosine similarity without numpy."""
+        
         if len(vec_a) != len(vec_b):
             raise ValueError("Vectors must be the same length")
+        #        
         
         dot_product = 0.0
         magnitude_a = 0.0
@@ -67,6 +68,9 @@ def embed_with_ollama(text: str) -> List[float]:
         raise ValueError(failure_message)
     #
     
+    # Ensure the embedding is a flat list
+    if any(isinstance(i, list) for i in embedding):
+        embedding = [item for sublist in embedding for item in sublist]
     return embedding
 #
 
@@ -89,12 +93,12 @@ if __name__ == "__main__":
 
     # Add documents one by one
     i = 0
-    for text in documents:
+    for document in documents:
         # Get embedding from Ollama
-        embedding = embed_with_ollama(text)
+        embedding = embed_with_ollama(document)
         
         # Add to DB
-        db.add_document(embedding, text)
+        db.add_document(embedding, document)
         i += 1
     #
     
@@ -102,12 +106,19 @@ if __name__ == "__main__":
 
     # Query
     query = "What animals are llamas related to?"
+    print(f"QUERY: {query}")
     query_embedding = embed_with_ollama(query)
     
     # Get results
     results = db.query(query_embedding, n_results=1)
     print("\nTop result:")
-    print(f"ID: {results[0][0]}")
-    print(f"Text: {results[0][1]}")
-    print(f"Similarity: {results[0][2]:.4f}")
+    top_result = results[0]
+    id = top_result[0]
+    similarity = top_result[1]
+    text = db.data[id]["doc_text"]
+    
+    print(f"ID: {id}")
+    print(f"Similarity: {similarity:.4f}")
+    print(f"Text: {text}")
+    
 #
