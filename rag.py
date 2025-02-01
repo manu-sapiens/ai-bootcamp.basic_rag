@@ -3,9 +3,13 @@ from vectordb import SimpleVectorDB
 from embeds import embed_with_ollama
 from llm import query_llm
 
+# THIS IS NOT a WORKING RAG pipeline, but it contains all the parts necessary to build one as an
+# exercise to the student.
+
 # Example usage
 if __name__ == "__main__":
 
+    # ------- Chunking -------
     text = load_text("pg75244.txt")
     documents = chunk_text(text, num_words=256, overlap_words=128)
     print("-------------")
@@ -15,6 +19,7 @@ if __name__ == "__main__":
     print(documents[0])
     print("-------------")
 
+    # ------- Vector DB -------
     # Initialize DB
     db = SimpleVectorDB()
 
@@ -24,14 +29,15 @@ if __name__ == "__main__":
         # Get embedding from Ollama
         embedding = embed_with_ollama(document)
         
-        # Add to DB
+        # Add document to vector DataBase
         db.add_document(embedding, document)
+        
         i += 1
     #
     
     print(f"Added {len(documents)} documents to the database.")
 
-    # Query
+    # ------- Query -------
     query = "Who killed Purcell?"
     print(f"QUERY: {query}")
     query_embedding = embed_with_ollama(query)
@@ -45,7 +51,8 @@ if __name__ == "__main__":
     text = db.data[id]["doc_text"]
     
     print(f"TOP CHUNK (id: {id}, similarity:{similarity:.4f}):\n{text}\n")
-    
+
+    # ------- LLM -------    
     # Compare with LLM (for fun)
     llm_answer = query_llm(query)
     print(f"LLM: {llm_answer}")
