@@ -4,6 +4,7 @@ from embeds import embed_with_ollama
 from llm import query_llm
 import time
 import sys
+import os
 
 # THIS IS NOT a WORKING RAG pipeline, but it contains all the parts necessary to build one as an
 # exercise to the student.
@@ -40,40 +41,65 @@ def fancy_progress_bar(current, total, bar_length=50, prefix='Progress:', suffix
 
 # Example usage
 if __name__ == "__main__":
-
-    # ------- Chunking -------
-    text = load_text("pg75244.txt")
-    documents = chunk_text(text, num_words=256, overlap_words=128)
-    print("-------------")
-    print(f"Nb of chunks: {len(documents)}")
-    print("-------------")
-    print("Example: chunk 0:")
-    print(documents[0])
-    print("-------------")
-
-    # ------- Vector DB -------
+    # Define database file paths
+    db_path = "vectordb.pkl"
+    hash_path = "hash_dict.pkl"
+    
     # Initialize DB
-    db = SimpleVectorDB()
+    db = SimpleVectorDB(db_path=db_path, hash_path=hash_path)
+    
+    # Try to load the database from disk
+    db_loaded = db.load_from_disk()
+    
+    # If the database doesn't exist or couldn't be loaded, create a new one
+    if not db_loaded:
+        print("No existing database found or could not load it. Creating a new one...")
+        
+        # ------- Chunking -------
+        text = load_text("pg75244.txt")
+        documents = chunk_text(text, num_words=256, overlap_words=128)
+        print("-------------")
+        print(f"Nb of chunks: {len(documents)}")
+        print("-------------")
+        print("Example: chunk 0:")
+        print(documents[0])
+        print("-------------")
 
-    # Add documents one by one
-    print("\nEmbedding documents:")
-    total_docs = len(documents)
-    start_time = time.time()
-    
-    for i, document in enumerate(documents):
-        # Get embedding from Ollama
-        embedding = embed_with_ollama(document)
+        # ------- Vector DB -------
+        # Add documents one by one
+        print("\nEmbedding documents:")
+        total_docs = len(documents)
+        start_time = time.time()
+        added_count = 0
+        skipped_count = 0
         
-        # Add document to vector DataBase
-        db.add_document(embedding, document)
+        for i, document in enumerate(documents):
+            # Get embedding from Ollama
+            embedding = embed_with_ollama(document)
+            
+            # Add document to vector DataBase (returns doc_id)
+            doc_id = db.add_document(embedding, document)
+            
+            # Check if this was a new document or an existing one
+            if doc_id == f"doc_{i + 1}":
+                added_count += 1
+            else:
+                skipped_count += 1
+            
+            # Update progress bar
+            fancy_progress_bar(i + 1, total_docs, prefix='Embedding:', suffix='Complete')
         
-        # Update progress bar
-        fancy_progress_bar(i + 1, total_docs, prefix='Embedding:', suffix='Complete')
-    
-    # Print a newline after the progress bar is complete
-    print("\n")
-    elapsed_time = time.time() - start_time
-    print(f"Added {total_docs} documents to the database in {elapsed_time:.2f} seconds.")
+        # Print a newline after the progress bar is complete
+        print("\n")
+        elapsed_time = time.time() - start_time
+        print(f"Added {added_count} new documents to the database.")
+        print(f"Skipped {skipped_count} duplicate documents.")
+        print(f"Total processing time: {elapsed_time:.2f} seconds.")
+        
+        # Save the database to disk
+        db.save_to_disk()
+    else:
+        print(f"Using existing database with {len(db.data)} documents.")
 
     # ------- Query -------
     query = "Who is darth vader the father of?" #"what is the color of the hair of Purcell?" #"Who killed Purcell?"

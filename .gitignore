@@ -1,5 +1,6 @@
 # Environment
 node_modules/
+*.pkl
 .env
 venv/
 env/
