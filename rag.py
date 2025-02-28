@@ -101,36 +101,56 @@ if __name__ == "__main__":
     else:
         print(f"Using existing database with {len(db.data)} documents.")
 
-    # ------- Query -------
-    query = "Who is darth vader the father of?" #"what is the color of the hair of Purcell?" #"Who killed Purcell?"
-    print(f"QUERY: {query}")
-    query_embedding = embed_with_ollama(query)
+    # ------- Interactive Query Loop -------
+    print("\n=== RAG Query System ===")
+    print("Type 'exit' to quit")
     
-    # Get results
-    results = db.query(query_embedding, n_results=10)
-    print("\nTop result:")
-    top_result = results[0]
-    id = top_result[0]
-    similarity = top_result[1]
-    text = db.data[id]["doc_text"]
-    
-    texts = ""  
-    i = 0
-    for result in results:
-        id = result[0]
-        similarity = result[1]
-        text = db.data[id]["doc_text"]
-        texts += f"ID={id}, TEXT={text}\n"
-        i += 1
-    #
-    prompt = f"""
-    I have the following fragments of information in my database: \n 
-    {texts} + \nBased on these fragments, can you answer the following question: 
-    {query}?\n. If no information is relevant, please say so.
-    """
+    while True:
+        user_input = input("\nEnter your question: ")
+        if user_input.lower() == "exit":
+            break
 
-    # ------- LLM -------    
-    # Compare with LLM (for fun)
-    llm_answer = query_llm(prompt)
-    print(f"LLM: {llm_answer}")
+        # Get embedding for the query
+        print("Generating embedding for your query...")
+        query_embedding = embed_with_ollama(user_input)
+        
+        # Query the database
+        print("Searching for relevant documents...")
+        results = db.query(query_embedding, n_results=10)
+        
+        # Display top result
+        top_result = results[0]
+        top_id = top_result[0]
+        top_similarity = top_result[1]
+        top_text = db.data[top_id]["doc_text"]
+        print(f"\nTop result (similarity: {top_similarity:.4f}):")
+        print(f"{top_text[:150]}...")
+        
+        # Prepare all results for the LLM
+        texts = ""
+        for i, result in enumerate(results):
+            doc_id = result[0]
+            similarity = result[1]
+            text = db.data[doc_id]["doc_text"]
+            texts += f"Fragment {i+1} (similarity: {similarity:.4f}): {text}\n\n"
+        
+        # Create prompt for LLM
+        prompt = f"""
+        I have the following fragments of information in my database:
+        
+        {texts}
+        
+        Based on these fragments, please answer the following question:
+        {user_input}
+        
+        If no information is relevant to the question, please say so.
+        """
+        
+        # Query LLM
+        print("\nGenerating answer...")
+        llm_answer = query_llm(prompt)
+        print(f"\nAnswer: {llm_answer}")
+    
+    print("\nThank you for using the RAG Query System. Goodbye!")
 #
+
