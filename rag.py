@@ -76,7 +76,7 @@ if __name__ == "__main__":
     print(f"Added {total_docs} documents to the database in {elapsed_time:.2f} seconds.")
 
     # ------- Query -------
-    query = "Who killed Purcell?"
+    query = "Who is darth vader the father of?" #"what is the color of the hair of Purcell?" #"Who killed Purcell?"
     print(f"QUERY: {query}")
     query_embedding = embed_with_ollama(query)
     
@@ -88,9 +88,23 @@ if __name__ == "__main__":
     similarity = top_result[1]
     text = db.data[id]["doc_text"]
     
-    print(f"TOP CHUNK (id: {id}, similarity:{similarity:.4f}):\n{text}\n")
+    texts = ""  
+    i = 0
+    for result in results:
+        id = result[0]
+        similarity = result[1]
+        text = db.data[id]["doc_text"]
+        texts += f"ID={id}, TEXT={text}\n"
+        i += 1
+    #
+    prompt = f"""
+    I have the following fragments of information in my database: \n 
+    {texts} + \nBased on these fragments, can you answer the following question: 
+    {query}?\n. If no information is relevant, please say so.
+    """
 
     # ------- LLM -------    
     # Compare with LLM (for fun)
-    llm_answer = query_llm(query)
+    llm_answer = query_llm(prompt)
     print(f"LLM: {llm_answer}")
+#
