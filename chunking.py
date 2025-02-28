@@ -61,9 +61,10 @@ def load_text(filename):
 def main():
     """Standalone mode: Save chunks to files for inspection. Overlap is in words."""
     if len(sys.argv) < 4:
-        print("Usage: python chunker.py <filename> <num_words> <overlap_words>")
+        print("Usage: python chunking.py <filename> <num_words> <overlap_words>")
         sys.exit(1)
 
+    print("First argument = ", sys.argv[0])
     filename = sys.argv[1]
     num_words = int(sys.argv[2])
     overlap_words = int(sys.argv[3])

@@ -1,7 +1,7 @@
 import ollama
 from typing import List
 
-EMBED_MODEL = "all-minilm"
+EMBED_MODEL = "all-minilm" #"llama3.2:latest"
 OLLAMA_EMBEDDING_KEY = "embeddings"
 
 def embed_with_ollama(text: str) -> List[float]:
@@ -28,4 +28,6 @@ if __name__ == "__main__":
     print(f"QUERY: {query}")
     query_embedding = embed_with_ollama(query)
     print(f"Embedding: {query_embedding}")
+    # show dimension of embedding
+    print(f"Dimension: {len(query_embedding)}")
 #
